@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Tarefas e Endereços</title>
+    <style>
+        /* Estilos básicos para organização inicial */
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        h1, h2 { text-align: center; color: #333; }
+        #login-section, #app-section {
+            max-width: 800px; /* Aumentei um pouco a largura */
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+         }
+        #app-section { display: none; } /* Começa escondido */
+        .password-field { margin-top: 10px; display: none; } /* Campo de senha começa escondido */
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input[type="password"], input[type="text"], input[type="date"], button {
+             /* width: calc(100% - 22px);  Removido para inputs menores */
+             padding: 10px;
+             margin-bottom: 15px;
+             border: 1px solid #ccc;
+             border-radius: 4px;
+             box-sizing: border-box;
+         }
+         input[type="checkbox"] { width: auto; margin-right: 5px; vertical-align: middle; } /* Ajuste checkbox */
+         button {
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            min-width: 80px; /* Largura mínima para botões */
+            margin-right: 10px; /* Espaço entre botões */
+        }
+        button:hover { background-color: #4cae4c; }
+        #login-button { width: 100%; } /* Botão login ocupa largura total */
+        #logout-button { background-color: #d9534f; width: auto; padding: 8px 15px; float: right; /* Alinha à direita */}
+        #logout-button:hover { background-color: #c9302c; }
+        #login-error { color: red; display: none; margin-top: 10px; text-align: center; font-weight: bold;}
+        #user-greeting { font-weight: bold; }
+        hr { border: 0; height: 1px; background-color: #eee; margin: 20px 0; }
+
+        /* === ESTILOS PARA MAPAS (TEMA AZUL E CAIXAS) === */
+
+        /* Cor externa (cabeçalho) para TODOS os mapas */
+        .map-header {
+            background-color: #87CEEB; /* Azul Celeste */
+            color: #000; /* Texto preto para melhor contraste */
+            border-bottom-color: #70B8D9; /* Tom de azul um pouco mais escuro para a borda inferior */
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .map-header:hover {
+             background-color: #70B8D9; /* Escurece um pouco no hover */
+        }
+        .map-header::after { content: ' ▼'; font-size: 0.8em; } /* Indicador inicial */
+        .map-header.expanded::after { content: ' ▲'; } /* Indicador quando expandido */
+
+        /* Cor interna (área dos endereços) para TODOS os mapas */
+        .map-addresses {
+            background-color: #EAF8FB; /* Azul um pouco mais acinzentado/claro */
+            padding: 15px;
+            display: none; /* Endereços começam escondidos */
+            border-top: 1px solid #B0E0E6; /* Tom de azul claro para a borda superior */
+        }
+
+        /* Cor da borda geral do item do mapa */
+        .map-item {
+            border: 1px solid #B0E0E6; /* Borda azul clara */
+            margin-bottom: 15px;
+            border-radius: 5px;
+            background-color: #fff; /* Fundo branco padrão para o item */
+            overflow: hidden; /* Garante que bordas arredondadas funcionem */
+        }
+
+        /* Estilo para CADA caixa de endereço individual */
+        .address-line {
+            background-color: #FFFFFF; /* Fundo branco para a caixa do endereço */
+            border: 1px solid #B0E0E6; /* Borda azul clara (mesma da borda do mapa) */
+            border-radius: 6px;       /* Cantos arredondados */
+            padding: 15px;            /* Espaçamento interno */
+            margin-bottom: 15px;      /* Espaço entre as caixas de endereço */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Sombra suave opcional */
+            color: #333; /* Cor do texto padrão */
+            font-weight: bold; /* Mantém o texto em negrito */
+        }
+
+        /* Ajuste para o último endereço não ter margem extra embaixo */
+        .address-line:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Layout dos campos dentro de address-line */
+        .address-line div { margin-bottom: 8px; } /* Espaço entre linhas de campo */
+        .address-line label {
+             font-weight: bold; /* Garante que labels também fiquem em negrito */
+             display: inline-block;
+             margin-right: 8px;
+             min-width: 110px; /* Largura mínima para labels */
+        }
+        .address-line input[type="text"] { width: calc(100% - 130px); /* Ajusta largura do input de texto */ }
+        .address-line input[type="date"], .address-line select { min-width: 150px; /* Largura mínima para data e select */ }
+        .address-line input, .address-line select {
+            vertical-align: middle;
+            font-weight: normal; /* Texto normal dentro dos inputs */
+            color: #333;
+        }
+        .address-line a {
+            color: #337ab7;
+            text-decoration: none;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .address-line a:hover { text-decoration: underline; }
+        .address-line button { /* Estilo para botões inline (Remover) */
+             margin-left: 15px;
+             background-color: #f0ad4e;
+             padding: 3px 8px;
+             font-size: 0.8em;
+             vertical-align: middle;
+        }
+         .address-line button:hover { background-color: #ec971f; }
+         .add-address-button { /* Estilo para botão Adicionar Endereço */
+            margin-top: 15px;
+            background-color: #337ab7;
+         }
+         .add-address-button:hover { background-color: #286090; }
+
+         /* Responsividade simples */
+         @media (max-width: 600px) {
+            #login-section, #app-section { margin: 10px; padding: 15px; }
+            .address-line label { min-width: 90px; }
+            .address-line input[type="text"] { width: calc(100% - 110px); }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.2em; }
+         }
+        /* === FIM DOS ESTILOS PARA MAPAS === */
+
+    </style>
+</head>
+<body>
+
+    <h1>Gerenciador de Mapas e Endereços</h1>
+
+    <!-- Seção de Login -->
+    <div id="login-section">
+        <h2>Login</h2>
+        <label for="user-select">Selecione seu nome:</label>
+        <select id="user-select" name="user-select">
+            <option value="">-- Selecione --</option>
+            <!-- Nomes serão adicionados aqui via JavaScript -->
+        </select>
+
+        <div id="password-field" class="password-field">
+            <label for="password-input">Senha (Admin):</label>
+            <input type="password" id="password-input" name="password">
+        </div>
+
+        <button id="login-button">Entrar</button>
+        <p id="login-error">Selecione um nome ou senha incorreta.</p> <!-- Mensagem de erro sempre presente, só controlamos display -->
+    </div>
+
+    <!-- Seção Principal do App (Inicialmente Oculta) -->
+    <div id="app-section">
+        <button id="logout-button">Sair</button>
+        <p style="margin-top: 0;">Bem-vindo(a), <span id="user-greeting-name"></span>!</p>
+        <hr style="clear: both;"> {/* Clear float do botão sair */}
+        <h2>Mapas</h2>
+        <div id="maps-container">
+            <!-- Os mapas e endereços serão carregados aqui -->
+            <p>Carregando mapas...</p>
+        </div>
+    </div>        
+
+
+
+
+// Continue adicionando os outros publicadores comuns e suas senhas
+                // IMPORTANTE: Não repita aqui os nomes que já estão em 'admins'.
+            };
+    
+            let currentUser = null;
+            let isAdmin = false;
+            let mapData = {}; // Para armazenar o estado dos endereços
+    
+
+    <script>
+            <script>
+        // --- Dados ---
+        const publicadores = [ // Lista de todos os usuários para o dropdown
+            "ANA LUIZA", "ANNA MARIA", "ANDRESSA", "ANDRÉ", "ANDRIANA", "APARECIDA", "ALINE LÍRIO",
+            "DERLIANE", "EDSON", "ELENISE", "ESTER", "EÚDE","GABRIEL","GIOVANNI", "INGRID", "JOANAS",
+            "JOVANA", "JOVÂNIA", "KELY", "LINDALVA", "LUIZABEL", "MARIA COTS", "MÁRCIA", "MARIO",
+            "MAYRA", "PÂMILLA", "RODRIGO", "SANDRA", "SARA", "SHERLIANE", "THIAGO", "TIAGO",
+            "VIVIAN", "WILLIAM"
+        ].sort(); // Já deixa ordenado
+
+        // IMPORTANTE: Senhas no código do cliente são inseguras para produção real!
+        const admins = { // Usuários com permissão de edição
+            "WILLIAM": "111111",
+            "MARIO": "222222",
+            "EÚDE": "333333",
+            "ANDRÉ": "444444",
+            "RODRIGO": "555555",
+            "GIOVANNI": "666666",
+            "THIAGO": "777777",
+            "EDSON": "888888"
+        };
+
+        // --- Senhas dos Publicadores Comuns ---
+        const publishersPasswords = {
+            // !!! IMPORTANTE: ADICIONE AQUI OS NOMES E SENHAS DOS PUBLICADORES COMUNS !!!
+            // O nome deve ser EXATAMENTE igual ao da lista 'publicadores'.
+            // Não inclua nomes que já estão em 'admins'.
+            // Exemplo:
+            // "ANA LUIZA": "senhaAna1",
+            // "ANNA MARIA": "senhaAnna2",
+            // "ANDRESSA": "senhaAndressa3",
+            // ... continue para todos os outros publicadores comuns
+        };
+
+        // Dados dos Mapas (com correções em Mapa 22 e Mapa 24)
+        let mapData = [
+            {
+                mapId: "mapa-1",
+                mapName: "Mapa 1",
+                addresses: [
+                    { id: "mapa-1-addr-1", endereco_texto: "Rua Sandro Boticelli, 88, Laranjeiras. Próx. Dório Silva", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-1-addr-2", endereco_texto: "Rua Lavoisier, 33, Laranjeiras. Atrás do Extrabom", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-1-addr-3", endereco_texto: "Rua Pamplona, 88, Vila Nova de Colares. Próximo ao CRAS", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-1-addr-4", endereco_texto: "Rua Juruá, 42, Serra Dourada II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-1-addr-5", endereco_texto: "Rua Juruá, 46, Serra Dourada II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-1-addr-6", endereco_texto: "Rua Cerejeiras, 8, São Marcos III", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-1-addr-7", endereco_texto: "Rua Niterói, 22, Central Carapina. 2º andar. Próx. a Igreja Universal", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- INÍCIO DO MAPA 2 ---
+            {
+                mapId: "mapa-2",
+                mapName: "Mapa 2",
+                addresses: [
+                    { id: "mapa-2-addr-1", endereco_texto: "Rua Gustavo Barroso, 102 C, Chácara Parreiral", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-2-addr-2", endereco_texto: "Rua Teresina, 21, José de Anchieta", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-2-addr-3", endereco_texto: "Av. Diamante, 12, José de Anchieta", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-2-addr-4", endereco_texto: "Rua Palma de Santa Rita, 13, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-2-addr-5", endereco_texto: "Rua Dr. Vicente Burian, 04, Residencial Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-2-addr-6", endereco_texto: "Travessa N, 09, Residencial Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-2-addr-7", endereco_texto: "Rua Distrito Federal, 68, Central Carapina. Rua do Posto de Saúde", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 2 ---
+           // --- INÍCIO DO MAPA 3 ---
+           {
+                mapId: "mapa-3",
+                mapName: "Mapa 3",
+                addresses: [
+                    { id: "mapa-3-addr-1", endereco_texto: "Rua Cedro, 39, José de Anchieta", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-3-addr-2", endereco_texto: "Rua Palma de Santa Rita, 77, Feu Rosa. Próximo ao Móveis Show", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-3-addr-3", endereco_texto: "Rua Teófilo Otoní, 8111, Nova Carapina", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-3-addr-4", endereco_texto: "Rua Araçá, 7, Cidade Pomar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-3-addr-5", endereco_texto: "Rua Ouro Preto, 25, Divinópolis", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-3-addr-6", endereco_texto: "Av. Arapongas, s/n, Costa Bela. Ao lado da casa n.º 3", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-3-addr-7", endereco_texto: "Rua Micronesia, 13, Cidade Continental - Setor Oceania", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 3 ---
+            // --- INÍCIO DO MAPA 4 ---
+            {
+                mapId: "mapa-4",
+                mapName: "Mapa 4",
+                addresses: [
+                    { id: "mapa-4-addr-1", endereco_texto: "Rua das Malvas, 18, Feu Rosa. Casa de cima", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-4-addr-2", endereco_texto: "Rua das Malvas, 7b, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-4-addr-3", endereco_texto: "Rua Bicas, 96, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-4-addr-4", endereco_texto: "Av. Brasília, 874, Planalto Serrano - Bloco B. Próximo à padaria", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-4-addr-5", endereco_texto: "Av. Brasília, 943, Planalto Serrano - Bloco B. Ao lado do Mat. de construção", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-4-addr-6", endereco_texto: "Rua Carlos Caminha, 38, Bairro das Laranjeiras (Jacaraípe). Atrás do hortifrut", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-4-addr-7", endereco_texto: "Rua Castro Alves, 237, São Diogo. Condomínio Vista do Horizonte, Torre D, Apto 309", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 4 ---
+            // --- INÍCIO DO MAPA 5 ---
+            {
+                mapId: "mapa-5",
+                mapName: "Mapa 5",
+                addresses: [
+                    { id: "mapa-5-addr-1", endereco_texto: "Rua Herman Stern, 8, Cond. Colinas, Bl 2, Apto 204, Colina de Laranjeiras", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-5-addr-2", endereco_texto: "Rua Herman Stern, 235, R. das Palmeiras, Bl H, Apto 705, Colina de Laranjeiras", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-5-addr-3", endereco_texto: "Rua dos Eucaliptos, 189, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-5-addr-4", endereco_texto: "Rua das Oliveiras, 15, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-5-addr-5", endereco_texto: "Rua Jacuípe, 100, Eldorado", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-5-addr-6", endereco_texto: "Rua São Luis, 23, Planalto Serrano - Bloco A", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-5-addr-7", endereco_texto: "Rua Afonso Schwab, 31, Bairro das Laranjeiras (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 5 ---
+            // --- INÍCIO DO MAPA 6 ---
+            {
+                mapId: "mapa-6",
+                mapName: "Mapa 6",
+                addresses: [
+                    { id: "mapa-6-addr-1", endereco_texto: "Rua Carlos Pereira Filho, 162, Laranjeiras Velha", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-6-addr-2", endereco_texto: "Rua Flor de Laranjeira, 32, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-6-addr-3", endereco_texto: "Rua Golfinhos, 21, Feu Rosa. Curva da Baleia", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-6-addr-4", endereco_texto: "Rua Castanheira, 13, Cidade Pomar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-6-addr-5", endereco_texto: "Rua Muqui. Casa de madeira na escadaria em frente à travessa,Bairro Jardim da Serra", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-6-addr-6", endereco_texto: "Rua João Marchiole, 23, Enseada de Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-6-addr-7", endereco_texto: "Rua J, s/n, Manoel Plaza. Casa 2 andares em frente ao n. 10", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+           // --- FIM DO MAPA 6 ---
+            // --- INÍCIO DO MAPA 7 ---
+            {
+                mapId: "mapa-7",
+                mapName: "Mapa 7",
+                addresses: [
+                    { id: "mapa-7-addr-1", endereco_texto: "Trav. 13 de Maio, 192, Taquara II, 2 andar. Portão preto", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-7-addr-2", endereco_texto: "Rua 13 de Maio, 12, Taquara. Fundos", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-7-addr-3", endereco_texto: "Rua Vila Vitória, 25. Próx. à escola EEEF Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-7-addr-4", endereco_texto: "Rua Periquito, 123, Nova Carapina. Próx. a pizzaria", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-7-addr-5", endereco_texto: "Av. Manhuaçu, 83, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-7-addr-6", endereco_texto: "Rua Guacyra, 590, Jardim Atlântico (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-7-addr-7", endereco_texto: "Rua Homero, 19, Cidade Continental - Setor Europa", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 7 ---
+            // --- INÍCIO DO MAPA 8 ---
+            {
+                mapId: "mapa-8",
+                mapName: "Mapa 8",
+                addresses: [
+                    { id: "mapa-8-addr-1", endereco_texto: "Rua Afonso Claudio, Cond. Casa Blanca, Bloco L, Apto 404, Valparaíso", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-8-addr-2", endereco_texto: "Rua Guriri, 25, Valparaíso", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-8-addr-3", endereco_texto: "Rua das Azaléias, 14, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-8-addr-4", endereco_texto: "Av. Belo Horizonte, 1376, Nova Carapina", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-8-addr-5", endereco_texto: "Rua Jacarandá, 1, Cidade Pomar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-8-addr-6", endereco_texto: "Av. São Pedro, 330, Parque Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-8-addr-7", endereco_texto: "Rua Rio Branco, 301, Parque Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 8 ---
+            // --- INÍCIO DO MAPA 9 ---
+            {
+                mapId: "mapa-9",
+                mapName: "Mapa 9",
+                addresses: [
+                    { id: "mapa-9-addr-1", endereco_texto: "Rua Santos Dumont, 302, Bloco Alasca, Apto 202, Valparaíso", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-9-addr-2", endereco_texto: "Rua Braúna, 10, Feu Rosa. Segundo andar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-9-addr-3", endereco_texto: "Rua Iguatemi, 988, Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-9-addr-4", endereco_texto: "Rua Topázio, 309, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-9-addr-5", endereco_texto: "Rua Cassiano Castelo, 18, Serra Sede", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-9-addr-6", endereco_texto: "Rua Floriano Peixoto, 380, Serra Sede", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-9-addr-7", endereco_texto: "Escadaria Rio Verde, 02, Bairro de Fátima. Final da Rua Rio Guajará", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 9 ---
+            // --- INÍCIO DO MAPA 10 ---
+            {
+                mapId: "mapa-10",
+                mapName: "Mapa 10",
+                addresses: [
+                    { id: "mapa-10-addr-1", endereco_texto: "Rua 14, Beco Santos Reis I (beco 11), Cantinho do Céu (Jardim Tropical)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-10-addr-2", endereco_texto: "Rua das Sete Bicas, 506, Cantinho do Céu (Jardim Tropical)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-10-addr-3", endereco_texto: "Rua Itamaracá, 756, Vila Nova de Colares. Esquina com Rua Jaú", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-10-addr-4", endereco_texto: "Rua Galiléia, 39, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-10-addr-5", endereco_texto: "Tv. Antônio Pereira Madruga, 66, São Judas Tadeu (Serra Sede)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-10-addr-6", endereco_texto: "Rua Araçatuba, 520, Residencial Jacaraípe. Próximo ao CMEI Vantuil Bessa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-10-addr-7", endereco_texto: "Rua Ágata, 33, Ed. Brasilianita, apto. 104 A, André Carloni", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 10 ---
+            // --- INÍCIO DO MAPA 11 ---
+            {
+                mapId: "mapa-11",
+                mapName: "Mapa 11",
+                addresses: [
+                    { id: "mapa-11-addr-1", endereco_texto: "Rua Ubu, Bloco R2, apto 108, Valparaíso", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-11-addr-2", endereco_texto: "Rua Manguinhos, 29, Valparaíso", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-11-addr-3", endereco_texto: "Rua Magnólia, 09, Serra Dourada ll", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-11-addr-4", endereco_texto: "Rua Altinópolis, 10, Planalto Serrano - Bloco A", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-11-addr-5", endereco_texto: "Rua Altinópolis, 123, Planalto Serrano - Bloco A", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-11-addr-6", endereco_texto: "Av. Atlantica, 16, Praia Grande", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-11-addr-7", endereco_texto: "Rua Hanibal Barca, 600, Balneário de Carapebus. Final da rua Direção", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 11 ---
+            // --- INÍCIO DO MAPA 12 ---
+            {
+                mapId: "mapa-12",
+                mapName: "Mapa 12",
+                addresses: [
+                    { id: "mapa-12-addr-1", endereco_texto: "Rua Santa Luzia, 45, Jardim Tropical", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-12-addr-2", endereco_texto: "Rua das Mangueiras, 44, Feu Rosa. Rua em frente à praça", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-12-addr-3", endereco_texto: "Av. Tumiritinga, 75, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-12-addr-4", endereco_texto: "Rua Cristo Rei, 39, São Marcos I. Casa verde, 1º andar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-12-addr-5", endereco_texto: "Rua Osório Duque Estrada, 109, Belvedere", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-12-addr-6", endereco_texto: "Rua Pôrto Alegre, 400, Parque Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-12-addr-7", endereco_texto: "Rua do Limão, 15, Nova Almeida. Segundo andar", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 12 ---
+            // --- INÍCIO DO MAPA 13 ---
+            {
+                mapId: "mapa-13",
+                mapName: "Mapa 13",
+                addresses: [
+                    { id: "mapa-13-addr-1", endereco_texto: "Rua Araruama, 123, Barcelona", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-13-addr-2", endereco_texto: "Rua dos Eucaliptos, 189", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-13-addr-3", endereco_texto: "Rua das Oliveiras, 15, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-13-addr-4", endereco_texto: "Rua Uberlândia, 795, Nova Carapina", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-13-addr-5", endereco_texto: "Rua Caju, 3, Cidade Pomar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-13-addr-6", endereco_texto: "Rua Goiabeiras, 321, Vista da Serra", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-13-addr-7", endereco_texto: "Av. Mário Batalha, Ed. D. Rodrigo, 539, Ap. 303, Bairro de Fátima", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 13 ---
+            // --- INÍCIO DO MAPA 14 ---
+            {
+                mapId: "mapa-14",
+                mapName: "Mapa 14",
+                addresses: [
+                    { id: "mapa-14-addr-1", endereco_texto: "Rua Brusque, 44, Barcelona", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-14-addr-2", endereco_texto: "Rua Itambacuri, 316, Nova Carapina", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-14-addr-3", endereco_texto: "Rua Arara, 10, Serra Dourada 3", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-14-addr-4", endereco_texto: "Rua das Hortências, 308, Cascata", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-14-addr-5", endereco_texto: "Rua Maria Pereira Pímentel, 49, Nova Almeida", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-14-addr-6", endereco_texto: "Rua Santa Tereza, 16, Nova Almeida. Terceira travessa, rua da delegacia", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 14 ---
+            // --- INÍCIO DO MAPA 15 ---
+            {
+                mapId: "mapa-15",
+                mapName: "Mapa 15",
+                addresses: [
+                    { id: "mapa-15-addr-1", endereco_texto: "Rua Itajaí, 148, Barcelona. Esquina com R. Blumenau", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-15-addr-2", endereco_texto: "Rua das Malvas, 7b, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-15-addr-3", endereco_texto: "Rua lpanema, 124, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-15-addr-4", endereco_texto: "Rua Rio Amambaí, 50, Eldorado", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-15-addr-5", endereco_texto: "Rua Boa Vista, 495, Planalto Serrano - Bloco A", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-15-addr-6", endereco_texto: "Av. Mário Batalha, 323, Bairro de Fátima", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 15 ---
+            // --- INÍCIO DO MAPA 16 ---
+            {
+                mapId: "mapa-16",
+                mapName: "Mapa 16",
+                addresses: [
+                    { id: "mapa-16-addr-1", endereco_texto: "Rua dos Solitários, 79, Cantinho do Céu", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-16-addr-2", endereco_texto: "Rua Pau Brasil, 46, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-16-addr-3", endereco_texto: "Rua Ipanema, 21, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-16-addr-4", endereco_texto: "Rua Rio Paraná, 111, Eldorado", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-16-addr-5", endereco_texto: "Rua das Orquídeas, 19, São Marcos III", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-16-addr-6", endereco_texto: "Rua Montenegro, 62, Praia Grande. Ponto final, próx. à Igreja Católica", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-16-addr-7", endereco_texto: "Av. José Martins Rato, 1117, Bairro de Fátima. Oficina de Pintura Automotiva", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 16 ---
+            // --- INÍCIO DO MAPA 17 ---
+            {
+                mapId: "mapa-17",
+                mapName: "Mapa 17",
+                addresses: [
+                    { id: "mapa-17-addr-1", endereco_texto: "Rua Juazeiro, 89, Barcelona", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-17-addr-2", endereco_texto: "Rua Santos, 52, Barcelona", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-17-addr-3", endereco_texto: "Rua Itu, 228, Vila Nova de Colares. Fundos", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-17-addr-4", endereco_texto: "Rua Irineu Florestini, 14, Nova Zelândia. Casa 2 andares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-17-addr-5", endereco_texto: "Rua das Japiras, 31, Porto Canoa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-17-addr-6", endereco_texto: "Rua Joana D'Arc, 304, Planalto Serrano - Bloco A", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-17-addr-7", endereco_texto: "Rua Nilo Peçanha, 209 A, Jardim Carapina", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 17 ---
+            // --- INÍCIO DO MAPA 18 ---
+            {
+                mapId: "mapa-18",
+                mapName: "Mapa 18",
+                addresses: [
+                    { id: "mapa-18-addr-1", endereco_texto: "Rua 13 de Maio, 19, Jardim Tropical. Fundos do Nena's Bar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-18-addr-2", endereco_texto: "Rua Itu, 94, Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-18-addr-3", endereco_texto: "Av. Manhuaçu, 31, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-18-addr-4", endereco_texto: "Rua Francisca Peixoto Miguel, 122, Cascata", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-18-addr-5", endereco_texto: "Rua Clério Vieira Falcão, 12, Bairro das Laranjeiras (Jacaraípe). Casa do portão verde", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-18-addr-6", endereco_texto: "Rua Santa Lúcia, 14, Bairro das Laranjeiras (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 18 ---
+            // --- INÍCIO DO MAPA 19 ---
+            {
+                mapId: "mapa-19",
+                mapName: "Mapa 19",
+                addresses: [
+                    { id: "mapa-19-addr-1", endereco_texto: "Rua Ipanema, 133, Morada de Laranjeiras", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-19-addr-2", endereco_texto: "Rua Ubatuba, 15, Morada de Laranjeiras", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-19-addr-3", endereco_texto: "Rua Pau Brasil, 119. Perto da estação de esgoto", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-19-addr-4", endereco_texto: "Rua Prímula, 09, Serra Dourada ll", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-19-addr-5", endereco_texto: "Rua Américo Miranda, 187, São Marcos II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-19-addr-6", endereco_texto: "Rua Campos do Jordão, 50, Residencial Jacaraípe", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-19-addr-7", endereco_texto: "Rua Mariano Souza Ramos, 05, Jardim Carapina. Segundo andar", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 19 ---
+            // --- INÍCIO DO MAPA 20 ---
+            {
+                mapId: "mapa-20",
+                mapName: "Mapa 20",
+                addresses: [
+                    { id: "mapa-20-addr-1", endereco_texto: "Rua Da Goiabeira, n 3, ao lado do Fred Bike, BALNEÁRIO DE CARAPEBUS", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-20-addr-2", endereco_texto: "Rua Carangola, 161, Nova Carapina II", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-20-addr-3", endereco_texto: "Rua Umburana, 02, Serra Dourada l. Próx. Igreja Maranata", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-20-addr-4", endereco_texto: "Rua Pancas, 137, Vista da Serra. Próximo ao antigo ponto final", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-20-addr-5", endereco_texto: "Av. Safira, 122, São Patrício (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-20-addr-6", endereco_texto: "Rua da Acácia, 1164, Balneário de Carapebus", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 20 ---
+           // --- INÍCIO DO MAPA 21 ---
+           {
+                mapId: "mapa-21",
+                mapName: "Mapa 21",
+                addresses: [
+                    { id: "mapa-21-addr-1", endereco_texto: "Rua das Nogueiras, 8, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-21-addr-2", endereco_texto: "Rua das Avencas, 12, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-21-addr-3", endereco_texto: "Beco Cinco, 29, Barro Branco", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-21-addr-4", endereco_texto: "Rua Dez, 111, Jardim Bela Vista. Casa segundo andar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-21-addr-5", endereco_texto: "Av. Guarani, 668, Planalto Serrano - Bloco C", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-21-addr-6", endereco_texto: "Rua Guaicurus, 12, Bairro das Laranjeiras (Jacaraípe). Continuação da rua pelo outro lado", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-21-addr-7", endereco_texto: "Rua Betim, 77, Jardim Carapina. Próximo ao Sup. Berenice", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 21 ---
+           // --- INÍCIO DO MAPA 22 (CORRIGIDO) ---
+           {
+                mapId: "mapa-22",
+                mapName: "Mapa 22",
+                addresses: [
+                    { id: "mapa-22-addr-1", endereco_texto: "Rua das Jaqueiras, 3, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-22-addr-2", endereco_texto: "Rua Rubens Anacleto, 4, Barro Branco", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-22-addr-3", endereco_texto: "Rua Dezessete, 189, Jardim Bela Vista", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-22-addr-4", endereco_texto: "Rua Dom Bosco, 92, Campinho da Serra. Esquina com rua Sete de Setembro. Favor verificar n. 18 na mesma rua.", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-22-addr-5", endereco_texto: "Rua da Constituinte, 4, Bairro das Laranjeiras (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-22-addr-6", endereco_texto: "Rua Guaicurus, 19, Bairro das Laranjeiras (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-22-addr-7", endereco_texto: "Rua Cristal, 90, André Carloni. Esquina com Rua Portugal", data_encontrado: null, e_estudante: false, publicador_responsavel: null } // ID corrigido de -1 para -7
+                ]
+            },
+            // --- FIM DO MAPA 22 ---
+             // --- INÍCIO DO MAPA 23 ---
+            {
+                mapId: "mapa-23",
+                mapName: "Mapa 23",
+                addresses: [
+                    { id: "mapa-23-addr-1", endereco_texto: "Rua dos Eucaliptos, 434, Feu Rosa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-2", endereco_texto: "Rua Pres. Juscelino Kubitscheck Oliveira, 104, Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-3", endereco_texto: "Rua Guiomar Soares, 36, Pitanga. Mercadinho da Tereza", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-4", endereco_texto: "Rua Ana Borges Miguel Castelo, 176, Jardim Bela Vista. Casa de dois andares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-5", endereco_texto: "Av. Guarani, 441, Planalto Serrano - Bloco C", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-6", endereco_texto: "Rua Afonso Claudio, 35, Nova Almeida. Próximo à escola Julite Miranda", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-7", endereco_texto: "Rua João Monlevade, 394, Parque das Gaivotas (Nova Almeida)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-23-addr-8", endereco_texto: "Rua Maria Ortiz, 19, Carapina Grande", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 23 ---
+            // --- INÍCIO DO MAPA 24 (CORRIGIDO) ---
+            {
+                mapId: "mapa-24",
+                mapName: "Mapa 24",
+                addresses: [ // IDs corrigidos de mapa-25-addr-X para mapa-24-addr-X
+                    { id: "mapa-24-addr-1", endereco_texto: "Rua Iguatemi, 472, Vila Nova de Colares. Em frente ao Souza Bar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-2", endereco_texto: "Rua Visconde de Pirajá, 236, Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-3", endereco_texto: "Rua Caxambú, 86, Mestre Álvaro. Ao lado da Igreja Maranata", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-4", endereco_texto: "Rua Vasco Fernandes Coutinho, 145b, Novo Porto Canoa. Casa amarela", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-5", endereco_texto: "Rua Acácia Roxa, 196, Jardim Primavera", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-6", endereco_texto: "Rua Teófilo Rodrigues, 287, Nova Almeida", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-7", endereco_texto: "Rua Jaguaré, 19, Parque das Gaivotas (Nova Almeida). Próximo à padaria Pão de Mel", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-24-addr-8", endereco_texto: "Rua Alegria, 81, Carapina Grande", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 24 ---
+            // --- INÍCIO DO MAPA 25 ---
+            {
+                mapId: "mapa-25",
+                mapName: "Mapa 25",
+                addresses: [
+                    { id: "mapa-25-addr-1", endereco_texto: "Rua Floriano Peixoto, 15, Vila Nova de Colares. Ao lado da casa nº 4", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-2", endereco_texto: "Rua Iguapé, 48, Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-3", endereco_texto: "Alameda Nelson Teixeira (Beco 1), 7, Barro Branco", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-4", endereco_texto: "Rua Acácia Amarela, 180, Jardim Primavera", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-5", endereco_texto: "Rua Santa Cecília, 82, Bairro das Laranjeiras (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-6", endereco_texto: "Rua Jerônimo Monteiro, 17, Parque das Gaivotas (Nova Almeida)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-7", endereco_texto: "Rua Lúcio Costa, 41, São Diogo", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-25-addr-8", endereco_texto: "Rua Florianópolis, próximo à praça. Cond. Campos Verdes, São Diogo", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 25 ---
+            // --- INÍCIO DO MAPA 26 ---
+            {
+                mapId: "mapa-26",
+                mapName: "Mapa 26",
+                addresses: [
+                    { id: "mapa-26-addr-1", endereco_texto: "Beco Itabatinga, 47, Vila Nova de Colares", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-26-addr-2", endereco_texto: "Rua Itamaraju, 192, Mestre Álvaro. Casa de esquina em frente ao bar", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-26-addr-3", endereco_texto: "Rua Jubati, entre nº. 5 e nº. 41, Novo Porto Canoa", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-26-addr-4", endereco_texto: "Rua Maranhão, 287, Planalto Serrano - Bloco B", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-26-addr-5", endereco_texto: "Rua Jacuí, 26, Planalto Serrano - Bloco C. Final da rua, lado direito", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-26-addr-6", endereco_texto: "Rua Guaicurus, 22, Bairro das Laranjeiras (Jacaraípe)", data_encontrado: null, e_estudante: false, publicador_responsavel: null },
+                    { id: "mapa-26-addr-7", endereco_texto: "Rua Manaus, 20, Central Carapina. Esquina com a Rua Distrito Federal", data_encontrado: null, e_estudante: false, publicador_responsavel: null }
+                ]
+            },
+            // --- FIM DO MAPA 26 ---
+        ];
+
+        // --- Variáveis Globais ---
+        let currentUser = null; // Guarda o NOME do usuário logado
+        let isAdmin = false; // Indica se o usuário logado é admin
+
+        // --- Elementos do DOM ---
+        const loginSection = document.getElementById('login-section');
+        const appSection = document.getElementById('app-section');
+        const userSelect = document.getElementById('user-select');
+        const passwordField = document.getElementById('password-field');
+        const passwordInput = document.getElementById('password-input');
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+        const loginError = document.getElementById('login-error');
+        const userGreetingName = document.getElementById('user-greeting-name');
+        const mapsContainer = document.getElementById('maps-container');
+
+        // --- Funções Auxiliares ---
+
+        // Gera o link do Google Maps
+        function generateMapsLink(addressText) {
+            if (!addressText) return '#';
+            const baseURL = "https://www.google.com.br/maps/search/";
+            const query = encodeURIComponent(addressText.trim().replace(/\s+/g, ' '));
+            const formattedQuery = query.replace(/%20/g, '+');
+            return baseURL + formattedQuery;
+        }
+
+        // Cria o dropdown de publicadores para um endereço
+        function createPublisherDropdown(selectedPublisher, addressId, isUserAdmin) { // Renomeado parâmetro para clareza
+            const select = document.createElement('select');
+            select.dataset.addressId = addressId;
+            select.disabled = !isUserAdmin; // Usa o parâmetro recebido
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.textContent = "-- Responsável --";
+            select.appendChild(defaultOption);
+
+            publicadores.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                if (name === selectedPublisher) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            if (isUserAdmin) { // Só adiciona o listener se for admin
+                 select.addEventListener('change', handlePublisherChange);
+            }
+            return select;
+        }
+
+        // --- Funções Principais ---
+
+        // Popula o select de usuários na tela de login
+        function populateUserSelect() {
+             while (userSelect.options.length > 1) { // Limpa opções antigas (exceto a primeira)
+                userSelect.remove(1);
+            }
+            publicadores.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                userSelect.appendChild(option);
+            });
+        }
+
+        // Mostra/esconde campo de senha ao selecionar usuário
+        function handleUserSelectionChange() {
+            const selectedName = userSelect.value;
+            // Verifica se o usuário selecionado precisa de senha (está em admins OU publishersPasswords)
+            const needsPassword = admins.hasOwnProperty(selectedName) || publishersPasswords.hasOwnProperty(selectedName);
+
+            passwordField.style.display = needsPassword ? 'block' : 'none';
+
+            // Ajusta o label da senha (opcional)
+            const passwordLabel = passwordField.querySelector('label');
+            if (passwordLabel) {
+                 passwordLabel.textContent = admins.hasOwnProperty(selectedName) ? 'Senha (Admin):' : 'Senha:';
+            }
+
+            if (!needsPassword) {
+                 passwordInput.value = ''; // Limpa senha se não for necessária
+            }
+            loginError.style.display = 'none'; // Esconde erro ao mudar seleção
+        }
+
+        // Processa a tentativa de login
+        function login() {
+            const selectedUser = userSelect.value;
+            const enteredPassword = passwordInput.value;
+
+            // Resetar estado anterior
+            currentUser = null;
+            isAdmin = false;
+            loginError.style.display = 'none'; // Esconde erro anterior
+
+            if (selectedUser === "" || selectedUser === "-- Selecione --") {
+                loginError.textContent = "Por favor, selecione seu nome.";
+                loginError.style.display = 'block';
+                return;
+            }
+
+            let loginSuccess = false;
+
+            // 1. Verificar se é um Administrador
+            if (admins.hasOwnProperty(selectedUser)) {
+                if (!enteredPassword) {
+                    loginError.textContent = "Por favor, digite sua senha de administrador.";
+                    loginError.style.display = 'block';
+                } else if (admins[selectedUser] === enteredPassword) {
+                    currentUser = selectedUser; // Guarda o nome do usuário logado
+                    isAdmin = true; // Define que é admin
+                    loginSuccess = true;
+                    console.log(`Admin ${currentUser} logado.`);
+                } else {
+                    loginError.textContent = "Senha de administrador incorreta!";
+                    loginError.style.display = 'block';
+                }
+            // 2. Se não for admin, verificar se é um Publicador Comum com senha definida
+            } else if (publishersPasswords.hasOwnProperty(selectedUser)) {
+                 if (!enteredPassword) {
+                    loginError.textContent = "Por favor, digite sua senha.";
+                    loginError.style.display = 'block';
+                 } else if (publishersPasswords[selectedUser] === enteredPassword) {
+                    currentUser = selectedUser; // Guarda o nome do usuário logado
+                    isAdmin = false; // Define que NÃO é admin
+                    loginSuccess = true;
+                    console.log(`Publicador ${currentUser} logado.`);
+                } else {
+                    loginError.textContent = "Senha de publicador incorreta!";
+                    loginError.style.display = 'block';
+                }
+            // 3. Se o nome está na lista geral mas não tem senha configurada (nem admin, nem publisher comum)
+            } else if (publicadores.includes(selectedUser)) {
+                 // Exige que TODOS tenham senha definida em 'admins' ou 'publishersPasswords'
+                 loginError.textContent = "Usuário não configurado para login com senha. Contate um administrador.";
+                 loginError.style.display = 'block';
+            } else {
+                // Caso o nome selecionado não esteja em nenhuma lista (improvável se populateUserSelect funcionou)
+                loginError.textContent = "Usuário inválido selecionado.";
+                loginError.style.display = 'block';
+            }
+
+            // Limpar campo de senha após tentativa
+            passwordInput.value = "";
+
+            // Se o login foi bem-sucedido, mostra a tela do app
+            if (loginSuccess) {
+                showAppView();
+                loadMaps(); // Carrega os mapas após o login
+            }
+        }
+
+        // Mostra a tela principal do aplicativo
+        function showAppView() {
+            userGreetingName.textContent = currentUser + (isAdmin ? ' (Admin)' : ''); // Mostra nome e se é admin
+            loginSection.style.display = 'none';
+            appSection.style.display = 'block';
+        }
+
+        // Mostra a tela de login (ao iniciar ou fazer logout)
+        function showLoginView() {
+            currentUser = null; // Limpa usuário logado
+            isAdmin = false; // Reseta status de admin
+            userSelect.value = ''; // Reseta seleção de usuário
+            passwordInput.value = ''; // Limpa campo de senha
+            passwordField.style.display = 'none'; // Esconde campo de senha
+            loginError.style.display = 'none'; // Esconde mensagens de erro
+            appSection.style.display = 'none'; // Esconde tela do app
+            loginSection.style.display = 'block'; // Mostra tela de login
+            mapsContainer.innerHTML = '<p>Carregando mapas...</p>'; // Limpa container de mapas
+        }
+
+        // Carrega e exibe os mapas na interface
+        function loadMaps() {
+            if (!currentUser) return; // Não faz nada se não houver usuário logado
+
+            mapsContainer.innerHTML = ''; // Limpa o container antes de recarregar
+
+            mapData.forEach(map => {
+                const mapItem = document.createElement('div');
+                mapItem.className = 'map-item';
+                mapItem.id = map.mapId;
+
+                const mapHeader = document.createElement('div');
+                mapHeader.className = 'map-header';
+                mapHeader.textContent = `${map.mapName} (${map.addresses.length} endereços)`;
+
+                const mapAddresses = document.createElement('div');
+                mapAddresses.className = 'map-addresses';
+                mapAddresses.style.display = 'none'; // Endereços começam escondidos
+
+                // Lógica para expandir/recolher
+                mapHeader.onclick = () => {
+                    const isExpanded = mapAddresses.style.display === 'block';
+                    mapAddresses.style.display = isExpanded ? 'none' : 'block';
+                    mapHeader.classList.toggle('expanded', !isExpanded);
+                };
+                mapItem.appendChild(mapHeader);
+
+                // Renderiza cada endereço dentro do mapa
+                map.addresses.forEach(address => {
+                    const addressLine = document.createElement('div');
+                    addressLine.className = 'address-line';
+                    addressLine.id = address.id;
+
+                    // Container para Endereço (Input)
+                    const addressDiv = document.createElement('div');
+                    const addressLabel = document.createElement('label');
+                    addressLabel.textContent = "Endereço:";
+                    const addressInput = document.createElement('input');
+                    addressInput.type = 'text';
+                    addressInput.value = address.endereco_texto;
+                    addressInput.disabled = !isAdmin; // Desabilita se não for admin
+                    addressInput.dataset.addressId = address.id;
+                    if (isAdmin) { // Só adiciona listener se for admin
+                        addressInput.addEventListener('change', handleAddressTextChange);
+                    }
+                    addressDiv.appendChild(addressLabel);
+                    addressDiv.appendChild(addressInput);
+                    addressLine.appendChild(addressDiv);
+
+                     // Container para Data e Estudante (na mesma linha)
+                    const dateStudentDiv = document.createElement('div');
+                    const dateLabel = document.createElement('label');
+                    dateLabel.textContent = "Encontrado Dia:";
+                    const dateInput = document.createElement('input');
+                    dateInput.type = 'date';
+                    dateInput.value = address.data_encontrado || '';
+                    dateInput.disabled = !isAdmin; // Desabilita se não for admin
+                    dateInput.dataset.addressId = address.id;
+                    if (isAdmin) { // Só adiciona listener se for admin
+                        dateInput.addEventListener('change', handleDateChange);
+                    }
+                    dateStudentDiv.appendChild(dateLabel);
+                    dateStudentDiv.appendChild(dateInput);
+
+                    const studentCheckbox = document.createElement('input');
+                    studentCheckbox.type = 'checkbox';
+                    studentCheckbox.checked = address.e_estudante;
+                    studentCheckbox.disabled = !isAdmin; // Desabilita se não for admin
+                    studentCheckbox.dataset.addressId = address.id;
+                    studentCheckbox.style.marginLeft = '20px';
+                    if (isAdmin) { // Só adiciona listener se for admin
+                        studentCheckbox.addEventListener('change', handleStudentChange);
+                    }
+                    const studentLabel = document.createElement('label');
+                    studentLabel.textContent = "É Estudante?";
+                    studentLabel.style.minWidth = 'auto';
+                    dateStudentDiv.appendChild(studentCheckbox);
+                    dateStudentDiv.appendChild(studentLabel);
+                    addressLine.appendChild(dateStudentDiv);
+
+                    // Container para Responsável, Link e Botões
+                    const responsibleDiv = document.createElement('div');
+                    const publisherLabel = document.createElement('label');
+                    publisherLabel.textContent = "Responsável:";
+                    // Passa o status de admin global para a função que cria o dropdown
+                    const publisherSelect = createPublisherDropdown(address.publicador_responsavel, address.id, isAdmin);
+                    responsibleDiv.appendChild(publisherLabel);
+                    responsibleDiv.appendChild(publisherSelect);
+
+                    // Link do Google Maps
+                    const mapsLink = document.createElement('a');
+                    mapsLink.target = '_blank';
+                    mapsLink.textContent = 'Ver no Google Maps';
+                    mapsLink.href = generateMapsLink(address.endereco_texto);
+                    responsibleDiv.appendChild(mapsLink);
+
+                    // Botão Remover (apenas para admins)
+                    if (isAdmin) {
+                        const removeButton = document.createElement('button');
+                        removeButton.textContent = 'Remover';
+                        removeButton.dataset.addressId = address.id;
+                        removeButton.dataset.mapId = map.mapId;
+                        removeButton.onclick = handleRemoveAddress;
+                        responsibleDiv.appendChild(removeButton);
+                    }
+                    addressLine.appendChild(responsibleDiv);
+
+                    mapAddresses.appendChild(addressLine);
+                });
+
+                 // Botão Adicionar Endereço (apenas para admins)
+                 if (isAdmin) {
+                    const addAddressButton = document.createElement('button');
+                    addAddressButton.textContent = '+ Adicionar Endereço a este Mapa';
+                    addAddressButton.className = 'add-address-button';
+                    addAddressButton.dataset.mapId = map.mapId;
+                    addAddressButton.onclick = handleAddAddress;
+                    mapAddresses.appendChild(addAddressButton);
+                 }
+
+                mapItem.appendChild(mapAddresses);
+                mapsContainer.appendChild(mapItem);
+            });
+        }
+
+        // --- Funções de Manipulação de Dados (Handlers) ---
+
+        // Atualiza texto do endereço e link do Maps
+        function handleAddressTextChange(event) {
+            const input = event.target;
+            const addressId = input.dataset.addressId;
+            const newText = input.value;
+
+            for (const map of mapData) {
+                const address = map.addresses.find(addr => addr.id === addressId);
+                if (address) {
+                    address.endereco_texto = newText;
+                    // Atualiza o link do Google Maps dinamicamente
+                    const linkElement = input.closest('.address-line').querySelector('a');
+                    if (linkElement) {
+                        linkElement.href = generateMapsLink(newText);
+                    }
+                    console.log("Endereço atualizado:", addressId, newText);
+                    saveData(); // Salva após a mudança
+                    break; // Sai do loop do mapa
+                }
+            }
+        }
+
+        // Atualiza data
+        function handleDateChange(event) {
+            const input = event.target;
+            const addressId = input.dataset.addressId;
+            const newDate = input.value;
+
+            for (const map of mapData) {
+                const address = map.addresses.find(addr => addr.id === addressId);
+                if (address) {
+                    address.data_encontrado = newDate || null; // Salva null se data for limpa
+                    console.log("Data atualizada:", addressId, newDate);
+                    saveData();
+                    break;
+                }
+            }
+        }
+
+        // Atualiza status de estudante
+        function handleStudentChange(event) {
+            const checkbox = event.target;
+            const addressId = checkbox.dataset.addressId;
+            const isStudent = checkbox.checked;
+
+            for (const map of mapData) {
+                const address = map.addresses.find(addr => addr.id === addressId);
+                if (address) {
+                    address.e_estudante = isStudent;
+                    console.log("Estudante atualizado:", addressId, isStudent);
+                    saveData();
+                    break;
+                }
+            }
+        }
+
+        // Atualiza publicador responsável
+        function handlePublisherChange(event) {
+             const select = event.target;
+             const addressId = select.dataset.addressId;
+             const newPublisher = select.value; // Pode ser "" se "-- Responsável --" for selecionado
+
+             for (const map of mapData) {
+                const address = map.addresses.find(addr => addr.id === addressId);
+                if (address) {
+                    address.publicador_responsavel = newPublisher || null; // Salva null se "" for selecionado
+                    console.log("Responsável atualizado:", addressId, newPublisher);
+                    saveData();
+                    break;
+                }
+            }
+        }
+
+        // Remove um endereço do mapa
+        function handleRemoveAddress(event) {
+            if (!isAdmin) return; // Segurança extra
+
+            const button = event.target;
+            const addressId = button.dataset.addressId;
+            const mapId = button.dataset.mapId;
+
+            // Encontra o texto do endereço para a confirmação
+            let addressText = `ID: ${addressId}`; // Fallback
+            const map = mapData.find(m => m.mapId === mapId);
+            if (map) {
+                const address = map.addresses.find(addr => addr.id === addressId);
+                if (address) addressText = address.endereco_texto;
+            }
+
+            // Confirmação
+            if (confirm(`Tem certeza que deseja remover este endereço?\n${addressText}`)) {
+                 const mapIndex = mapData.findIndex(m => m.mapId === mapId);
+                 if (mapIndex > -1) {
+                    const addressIndex = mapData[mapIndex].addresses.findIndex(addr => addr.id === addressId);
+                    if (addressIndex > -1) {
+                        mapData[mapIndex].addresses.splice(addressIndex, 1); // Remove o endereço da array
+                        console.log("Endereço removido:", addressId);
+                        saveData(); // Salva a alteração
+                        loadMaps(); // Recarrega a visualização dos mapas
+                    }
+                 }
+            }
+        }
+
+        // Adiciona um novo endereço ao mapa
+        function handleAddAddress(event) {
+            if (!isAdmin) return; // Segurança extra
+
+            const button = event.target;
+            const mapId = button.dataset.mapId;
+            const map = mapData.find(m => m.mapId === mapId);
+
+            if (!map) return;
+
+            const newAddressText = prompt(`Digite o novo endereço para o ${map.mapName}:`);
+            if (newAddressText && newAddressText.trim() !== "") {
+                const newId = `${mapId}-addr-${Date.now()}`; // Gera um ID único baseado no tempo
+                const newAddress = {
+                    id: newId,
+                    endereco_texto: newAddressText.trim(),
+                    data_encontrado: null,
+                    e_estudante: false,
+                    publicador_responsavel: null
+                };
+                map.addresses.push(newAddress); // Adiciona à array de endereços do mapa
+                console.log("Endereço adicionado:", newId, "ao mapa", mapId);
+                saveData(); // Salva a alteração
+                loadMaps(); // Recarrega a visualização dos mapas
+            } else if (newAddressText !== null) { // Verifica se não foi cancelado
+                 alert("O texto do endereço não pode estar vazio.");
+            }
+        }
+
+        // --- Persistência de Dados (localStorage) ---
+
+        const STORAGE_KEY = 'mapAppUserData'; // Chave para salvar no localStorage
+
+        // Salva o estado atual de mapData no localStorage
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(mapData));
+                console.log("Dados salvos no localStorage.");
+            } catch (e) {
+                console.error("Erro ao salvar dados no localStorage:", e);
+                alert("Erro ao salvar dados. O armazenamento local pode estar cheio ou indisponível.");
+            }
+        }
+
+        // Carrega os dados do localStorage ao iniciar
+        function loadData() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                try {
+                    const parsedData = JSON.parse(savedData);
+                    // Validação básica para garantir que é um array (estrutura esperada)
+                    if (Array.isArray(parsedData)) {
+                         // Verifica se a estrutura interna parece correta (opcional, mas bom)
+                         if (parsedData.length === 0 || (parsedData[0] && parsedData[0].mapId && Array.isArray(parsedData[0].addresses))) {
+                            mapData = parsedData;
+                            console.log("Dados carregados do localStorage.");
+                         } else {
+                             console.warn("Dados salvos parecem ter estrutura interna inválida. Usando dados padrão.");
+                             // Opcional: Backup antes de sobrescrever
+                             // localStorage.setItem(STORAGE_KEY + '_invalid_structure_' + Date.now(), savedData);
+                         }
+                    } else {
+                        console.warn("Dados salvos não são um array. Usando dados padrão.");
+                        // Opcional: Backup
+                        // localStorage.setItem(STORAGE_KEY + '_not_array_' + Date.now(), savedData);
+                    }
+                } catch (e) {
+                    console.error("Erro ao processar dados do localStorage:", e);
+                     // Opcional: Backup
+                     // localStorage.setItem(STORAGE_KEY + '_corrupted_' + Date.now(), savedData);
+                     alert("Erro ao carregar dados salvos. Podem estar corrompidos. Usando dados padrão.");
+                }
+            } else {
+                console.log("Nenhum dado salvo encontrado. Usando dados padrão definidos no código.");
+                // Se não há dados salvos, salva os dados padrão iniciais
+                saveData();
+            }
+        }
+
+
+        // --- Event Listeners ---
+        userSelect.addEventListener('change', handleUserSelectionChange); // Atualiza UI ao mudar usuário
+        loginButton.addEventListener('click', login); // Tenta fazer login ao clicar no botão
+        logoutButton.addEventListener('click', showLoginView); // Faz logout ao clicar no botão
+        // Permite login pressionando Enter no campo de senha
+        passwordInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                login();
+            }
+        });
+
+
+        // --- Inicialização ---
+        loadData(); // Carrega dados salvos ANTES de qualquer outra coisa
+        populateUserSelect(); // Popula o select com a lista de publicadores
+        // A tela de login é mostrada por padrão via CSS/HTML
+
+    </script>
+
+    </script>
+
+</body>
+</html>

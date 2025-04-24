@@ -1,0 +1,21 @@
+{
+  "name": "Mapas Ls Serra",
+  "short_name": "MapasLs",
+  "description": "Aplicativo para gerenciar mapas e endereços designados.",
+  "start_url": "MapasLsSerra.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#87CEEB",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

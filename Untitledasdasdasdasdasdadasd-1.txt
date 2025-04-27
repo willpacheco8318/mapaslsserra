@@ -1,0 +1,15 @@
+// Importa a função necessária da biblioteca Supabase
+import { createClient } from '@supabase/supabase-js';
+
+// --- IMPORTANTE: Substitua pelos seus dados reais! ---
+// Você encontra isso no painel do seu projeto Supabase:
+// Project Settings -> API
+const supabaseUrl = 'https://lflbgbtckbgfitaowoef.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmbGJnYnRja2JnZml0YW93b2VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0NjEwNTcsImV4cCI6MjA2MTAzNzA1N30.pwUmC4RNid6E03zERPlkyPf_eB6a_RgZ-LlcbUe7rgU';
+// -----------------------------------------------------
+
+// Cria a instância do cliente Supabase
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Exporta a instância para que outros arquivos possam usá-la
+export default supabase;

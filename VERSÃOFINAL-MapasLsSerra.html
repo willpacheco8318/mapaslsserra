@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Mapas</title>
+    <!-- 1. Inclua a biblioteca Supabase AQUI -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+   
+</head>
+<body>
+    <h1>Gerenciador de Mapas LS Serra</h1>
+
+    <!-- 2. Seu HTML da interface -->
+    <section id="login-section">
+        <h2>Login</h2>
+        <div>
+            <label for="user-select">Selecione o Usuário:</label>
+            <select id="user-select">
+                <option value="">Carregando usuários...</option>
+            </select>
+        </div>
+        <div id="password-field" style="display: none;">
+            <label for="password-input">Senha:</label>
+            <input type="password" id="password-input">
+        </div>
+        <button id="login-button" disabled>Entrar</button>
+        <p>ou</p>
+        <!-- Botão de Login com Google Adicionado -->
+        <button id="google-login-button">Entrar com Google</button>
+        <p id="login-error"></p>
+    </section>
+
+    <section id="app-section">
+        <div id="user-greeting">
+            Olá, <span id="user-greeting-name">Usuário</span>!
+            <button id="logout-button">Sair</button>
+        </div>
+
+        <div id="admin-actions" style="display: none; margin-bottom: 20px;">
+            <h3>Ações de Administrador</h3>
+            <button id="create-map-button">Criar Novo Mapa</button>
+            <!-- Outras ações de admin podem vir aqui -->
+        </div>
+
+        <h2>Mapas Disponíveis</h2>
+        <div id="maps-container">
+            Carregando mapas...
+        </div>
+    </section>
+
+    <!-- 3. SEU ÚNICO BLOCO DE SCRIPT PRINCIPAL -->
+    <script>
+        // --- Supabase Client Initialization ---
+        const SUPABASE_URL = 'https://lflbgbtckbgfitaowoef.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmbGJnYnRja2JnZml0YW93b2VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0NjEwNTcsImV4cCI6MjA2MTAzNzA1N30.pwUmC4RNid6E03zERPlkyPf_eB6a_RgZ-LlcbUe7rgU';
+
+        // Validação básica
+        if (!SUPABASE_URL || SUPABASE_URL.includes('COLOQUE_SUA_URL') || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('COLOQUE_SUA_CHAVE')) {
+            console.warn("AVISO: As credenciais do Supabase parecem ser as de exemplo ou estão vazias. Verifique se estão corretas.");
+            alert("ERRO: Credenciais do Supabase não configuradas corretamente!");
+        }
+
+        // Inicializa o cliente Supabase
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Cliente Supabase inicializado.");
+
+        // --- Variáveis Globais ---
+        let currentUser = null; // Guarda informações do usuário logado { id: '...', email: '...', role: '...', name: '...' }
+        let allUsers = []; // Cache para a lista de usuários/publicadores
+
+        // --- Elementos do DOM ---
+        console.log("Obtendo elementos do DOM...");
+        const loginSection = document.getElementById('login-section');
+        const appSection = document.getElementById('app-section');
+        const userSelect = document.getElementById('user-select');
+        const passwordField = document.getElementById('password-field');
+        const passwordInput = document.getElementById('password-input');
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+        const loginError = document.getElementById('login-error');
+        const userGreeting = document.getElementById('user-greeting');
+        const userGreetingName = document.getElementById('user-greeting-name');
+        const mapsContainer = document.getElementById('maps-container');
+        const adminActionsDiv = document.getElementById('admin-actions');
+        const createMapButton = document.getElementById('create-map-button');
+        // Adicionado: Referência ao botão do Google
+        const googleLoginButton = document.getElementById('google-login-button');
+        console.log("Elementos do DOM obtidos.");
+
+        // --- Funções Auxiliares ---
+        function generateMapsLink(addressText) {
+            console.log("Gerando link para:", addressText);
+            if (!addressText) return '#'; // Retorna '#' se o endereço for vazio
+            const encodedAddress = encodeURIComponent(addressText);
+            return `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+        }
+
+        function createPublisherDropdown(selectedPublisherId, addressId, isAdmin) {
+            console.log(`Criando dropdown para endereço ${addressId}, selecionado: ${selectedPublisherId}, admin: ${isAdmin}`);
+            const select = document.createElement('select');
+            select.dataset.addressId = addressId;
+            select.dataset.field = 'responsible_publisher_id'; // Adiciona o campo para o handler genérico
+            // Usuário normal só pode editar se for o responsável atual E NÃO for admin
+            // Admin pode editar sempre
+            select.disabled = !isAdmin && currentUser?.id !== selectedPublisherId;
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.textContent = "Não atribuído";
+            select.appendChild(defaultOption);
+
+            allUsers.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = user.username;
+                if (user.id === selectedPublisherId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            // Usa o handler genérico agora
+            select.addEventListener('change', handleFieldChange);
+            return select;
+        }
+
+        // --- Funções Principais (MODIFICADAS/NOVAS com Supabase) ---
+
+        async function fetchAndCacheUsers() {
+            console.log("Buscando lista de usuários/perfis...");
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('id, username, email')
+                    .order('username', { ascending: true });
+
+                if (error) throw error;
+
+                allUsers = data || [];
+                console.log("Usuários/Perfis carregados:", allUsers);
+                populateUserSelect();
+
+            } catch (error) {
+                console.error("Erro ao buscar usuários/perfis:", error.message);
+                alert("Não foi possível carregar a lista de usuários. Verifique o console e a conexão.");
+                allUsers = [];
+                populateUserSelect();
+            }
+        }
+
+        function populateUserSelect() {
+            console.log("Populando select de usuários...");
+            userSelect.innerHTML = '';
+
+            if (allUsers.length === 0) {
+                const option = document.createElement('option');
+                option.value = "";
+                option.textContent = "Nenhum usuário encontrado";
+                userSelect.appendChild(option);
+                loginButton.disabled = true;
+                return;
+            }
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.textContent = "-- Selecione --";
+            userSelect.appendChild(defaultOption);
+
+            allUsers.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.email;
+                option.textContent = user.username;
+                option.dataset.userId = user.id; // Guarda o ID para referência se necessário
+                userSelect.appendChild(option);
+            });
+
+            userSelect.disabled = false;
+        }
+
+        function handleUserSelection() {
+            const selectedEmail = userSelect.value;
+            if (selectedEmail) {
+                passwordField.style.display = 'block';
+                passwordInput.value = '';
+                passwordInput.focus();
+                loginButton.disabled = false;
+                loginError.textContent = '';
+            } else {
+                passwordField.style.display = 'none';
+                loginButton.disabled = true;
+            }
+        }
+
+        async function handleLogin() {
+            console.log("Tentando fazer login...");
+            const email = userSelect.value;
+            const password = passwordInput.value;
+            loginError.textContent = '';
+            loginButton.disabled = true;
+            loginButton.textContent = 'Entrando...';
+            // Desabilita também o botão do Google durante o login normal
+            if (googleLoginButton) googleLoginButton.disabled = true;
+
+
+            if (!email || !password) {
+                loginError.textContent = 'Por favor, selecione um usuário e digite a senha.';
+                loginButton.disabled = false;
+                loginButton.textContent = 'Entrar';
+                 if (googleLoginButton) googleLoginButton.disabled = false; // Reabilita Google
+                return;
+            }
+
+            try {
+                const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
+
+                if (authError) {
+                    console.error("Erro de autenticação:", authError.message);
+                    if (authError.message.includes('Invalid login credentials')) {
+                         loginError.textContent = 'Usuário ou senha inválidos.';
+                    } else {
+                         loginError.textContent = 'Erro ao tentar fazer login. Tente novamente.';
+                    }
+                    throw authError;
+                }
+
+                console.log("Autenticação bem-sucedida:", authData);
+
+                // Busca o perfil após autenticação
+                const userId = authData.user.id;
+                const { data: profile, error: profileError } = await supabaseClient
+                    .from('profiles')
+                    .select('id, username, role, email') // Pega todos os dados necessários
+                    .eq('id', userId)
+                    .single();
+
+                if (profileError || !profile) {
+                    console.error("Erro ao buscar perfil ou perfil não encontrado:", profileError?.message || "Perfil não existe");
+                    loginError.textContent = 'Usuário autenticado, mas não foi possível carregar os dados do perfil.';
+                    await supabaseClient.auth.signOut(); // Desloga se não achar perfil
+                    throw profileError || new Error("Perfil não encontrado");
+                }
+
+                console.log("Perfil encontrado:", profile);
+
+                // Armazena dados do usuário logado
+                currentUser = {
+                    id: profile.id,
+                    email: profile.email || authData.user.email, // Usa email do perfil ou do auth
+                    name: profile.username, // Usa username do perfil
+                    role: profile.role || 'user' // Assume 'user' como padrão se não houver role
+                };
+
+                showAppView();
+                loadMapsFromSupabase();
+
+            } catch (error) {
+                // Limpa senha e reabilita botões em caso de erro
+                passwordInput.value = '';
+                loginButton.disabled = false;
+                loginButton.textContent = 'Entrar';
+                 if (googleLoginButton) googleLoginButton.disabled = false; // Reabilita Google em caso de erro
+            }
+        }
+
+        // Adicionada: Função para lidar com o login do Google
+        async function handleGoogleLogin() {
+            console.log("Tentando login com Google...");
+            googleLoginButton.disabled = true; // Desabilita durante o processo
+            googleLoginButton.textContent = 'Aguarde...';
+            loginError.textContent = ''; // Limpa erros anteriores
+            // Desabilita também o botão de login normal
+            loginButton.disabled = true;
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { // Opcional: para onde redirecionar após o login do Google
+                      redirectTo: window.location.origin // Redireciona de volta para a página atual
+                    }
+                });
+
+                if (error) {
+                    throw error; // Joga para o catch
+                }
+
+                console.log("Redirecionando para o Google Auth...");
+                // O Supabase cuida do redirecionamento. A página recarregará
+                // e checkUserSessionAndInitialize pegará a sessão.
+
+            } catch (error) {
+                console.error("Erro ao tentar login com Google:", error.message);
+                loginError.textContent = 'Não foi possível iniciar o login com Google. Tente novamente.';
+                googleLoginButton.disabled = false;
+                googleLoginButton.textContent = 'Entrar com Google';
+                // Reabilita o botão de login normal se a seleção de usuário permitir
+                handleUserSelection(); // Verifica se o botão de login normal deve ser reabilitado
+            }
+        }
+
+
+        function showAppView() {
+            console.log("Mostrando visão da aplicação...");
+            loginSection.style.display = 'none';
+            appSection.style.display = 'block';
+            userGreetingName.textContent = currentUser?.name || 'Usuário';
+
+            // Mostra/Esconde ações de admin baseado no role
+            if (currentUser?.role === 'admin') {
+                adminActionsDiv.style.display = 'block';
+            } else {
+                adminActionsDiv.style.display = 'none';
+            }
+        }
+
+        async function showLoginView() {
+            console.log("Mostrando visão de login (Logout)...");
+
+            // Tenta deslogar do Supabase
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) {
+                console.error("Erro ao fazer logout:", error.message);
+                alert("Ocorreu um erro ao tentar sair. Recarregue a página.");
+            } else {
+                 console.log("Logout bem-sucedido.");
+            }
+
+            // Limpa estado da aplicação
+            currentUser = null;
+            appSection.style.display = 'none';
+            loginSection.style.display = 'block';
+            passwordField.style.display = 'none';
+            passwordInput.value = '';
+            userSelect.value = ''; // Reseta o select
+            loginButton.disabled = true; // Desabilita botão de login
+            loginButton.textContent = 'Entrar';
+            // Reabilita e reseta o botão do Google
+            if (googleLoginButton) {
+                 googleLoginButton.disabled = false;
+                 googleLoginButton.textContent = 'Entrar com Google';
+            }
+            loginError.textContent = '';
+            mapsContainer.innerHTML = 'Carregando mapas...'; // Limpa container de mapas
+
+            // Recarrega a lista de usuários para o dropdown de login
+            await fetchAndCacheUsers();
+        }
+        async function loadMapsFromSupabase() {
+            console.log("Carregando mapas do Supabase...");
+            mapsContainer.innerHTML = 'Carregando mapas...';
+
+            try {
+                // *** CORREÇÃO APLICADA AQUI ***
+                // Agora pedimos explicitamente os dados da tabela 'addresses'
+                // e, dentro dela, os dados da tabela 'profiles' relacionada ao responsável.
+                const { data: mapsWithAddresses, error } = await supabaseClient
+                    .from('maps')
+                    .select(`
+                        id, name, created_at,
+                        addresses (
+                            id,
+                            address_text,
+                            found_date,
+                            is_student,
+                            responsible_publisher_id,
+                            created_at,
+                            anotacao,
+                            profiles ( id, username ) 
+                        )
+                    `)
+                    .order('created_at', { ascending: false }); // Ordena mapas por data de criação
+
+                if (error) throw error;
+
+                console.log("Mapas carregados:", mapsWithAddresses);
+                mapsContainer.innerHTML = ''; // Limpa container
+
+                if (!mapsWithAddresses || mapsWithAddresses.length === 0) {
+                    mapsContainer.textContent = 'Nenhum mapa encontrado.';
+                    return;
+                }
+
+                const isAdmin = currentUser?.role === 'admin';
+
+                // Renderiza cada mapa
+                mapsWithAddresses.forEach(map => {
+                    const mapCard = document.createElement('div');
+                    mapCard.classList.add('map-card');
+                    mapCard.dataset.mapId = map.id;
+
+                    const mapTitle = document.createElement('h3');
+                    mapTitle.textContent = map.name || `Mapa ${map.id}`;
+                    mapCard.appendChild(mapTitle);
+
+                    // Botão Adicionar Endereço (só para admin)
+                    if (isAdmin) {
+                        const addAddressButton = document.createElement('button');
+                        addAddressButton.textContent = 'Adicionar Endereço';
+                        addAddressButton.dataset.mapId = map.id;
+                        addAddressButton.addEventListener('click', handleAddAddress);
+                        mapCard.appendChild(addAddressButton);
+                    }
+
+                    
+                    // Botão Adicionar Endereço (só para admin)
+                    if (isAdmin) {
+                        const addAddressButton = document.createElement('button');
+                        addAddressButton.textContent = 'Adicionar Endereço';
+                        addAddressButton.dataset.mapId = map.id;
+                        addAddressButton.addEventListener('click', handleAddAddress);
+                        mapCard.appendChild(addAddressButton);
+                    }
+
+                    const addressesList = document.createElement('div');
+                    addressesList.classList.add('addresses-list');
+
+                    // Renderiza endereços (se houver)
+                    if (map.addresses && map.addresses.length > 0) {
+                        // Ordena endereços alfabeticamente
+                        map.addresses.sort((a, b) => (a.address_text || '').localeCompare(b.address_text || ''));
+                        map.addresses.forEach(address => {
+                            // *** Passa isAdmin para createAddressElement ***
+                            const addressElement = createAddressElement(address, isAdmin);
+                            addressesList.appendChild(addressElement);
+                        });
+                    } else {
+                        addressesList.textContent = 'Nenhum endereço neste mapa.';
+                    }
+
+                    mapCard.appendChild(addressesList);
+                    mapsContainer.appendChild(mapCard);
+                });
+
+            } catch (error) {
+                console.error("Erro ao carregar mapas:", error.message);
+                // Mostra o erro específico do Supabase na UI para facilitar a depuração
+                mapsContainer.innerHTML = `<p style="color: red;">Erro ao carregar mapas: "${error.message}"</p>`;
+            }
+        }
+
+
+        // *** MODIFICAÇÃO AQUI: Aplica as permissões visuais ***
+        function createAddressElement(address, isAdmin) {
+            const div = document.createElement('div');
+            div.classList.add('address-item');
+            div.dataset.addressId = address.id;
+
+                  
+                
+
+
+            // Texto do Endereço (editável APENAS para admin) - SEM MUDANÇA
+            const addressSpan = document.createElement('span');
+            addressSpan.textContent = address.address_text || 'Endereço não informado';
+            addressSpan.style.margin = '0 10px';
+            if (isAdmin) { // Só admin pode editar o texto
+                addressSpan.contentEditable = true;
+                addressSpan.dataset.field = 'address_text';
+                addressSpan.addEventListener('blur', handleFieldChange);
+                addressSpan.addEventListener('keypress', (e) => {
+                     if (e.key === 'Enter') {
+                         e.preventDefault();
+                         e.target.blur();
+                     }
+                });
+            } else {
+                 addressSpan.contentEditable = false; // Garante que não seja editável para não-admins
+            }
+            div.appendChild(addressSpan);// Campo de Data "Encontrado Dia" - AGORA HABILITADO PARA TODOS
+                const foundDateLabel = document.createElement('label');
+            foundDateLabel.textContent = 'Encontrado Dia: ';
+            foundDateLabel.style.marginRight = '5px'; // Espaço entre label e input
+
+            const foundDateInput = document.createElement('input');
+            foundDateInput.type = 'date'; // <<< TIPO DATE PARA O CALENDÁRIO
+            foundDateInput.dataset.field = 'found_date';
+            // Formata a data do Supabase (ISO string) para YYYY-MM-DD ou deixa vazio
+            foundDateInput.value = address.found_date ? address.found_date.substring(0, 10) : '';
+            // foundDateInput.disabled = !isAdmin; // REMOVIDO: Habilitado para todos os logados
+            foundDateInput.addEventListener('change', handleFieldChange); // Usa o mesmo handler
+
+            // Agrupa label e input para melhor layout (opcional, mas bom)
+            const foundDateContainer = document.createElement('div');
+            foundDateContainer.style.display = 'inline-block'; // Para ficar na mesma linha de outros elementos
+            foundDateContainer.style.marginRight = '15px'; // Espaço após o campo de data
+            foundDateContainer.appendChild(foundDateLabel);
+            foundDateContainer.appendChild(foundDateInput);
+
+            div.appendChild(foundDateContainer); // Adiciona o container com label e input
+
+            // Link para Google Maps - SEM MUDANÇA
+            const mapsLink = document.createElement('a');
+            mapsLink.href = generateMapsLink(address.address_text || '');
+            mapsLink.textContent = '(Ver No Google Maps)';
+            mapsLink.target = '_blank';
+            mapsLink.style.fontSize = '0.8em';
+            mapsLink.style.marginLeft = '5px';
+            div.appendChild(mapsLink);
+
+            // Checkbox "Estudante" - AGORA HABILITADO PARA TODOS
+            const studentLabel = document.createElement('label');
+            studentLabel.textContent = 'Essa pessoa já é Estudante?: ';
+            studentLabel.style.marginLeft = '15px';
+            const studentCheckbox = document.createElement('input');
+            studentCheckbox.type = 'checkbox';
+            studentCheckbox.checked = address.is_student || false;
+            studentCheckbox.dataset.field = 'is_student';
+            // studentCheckbox.disabled = !isAdmin; // REMOVIDO: Habilitado para todos os logados
+            studentCheckbox.addEventListener('change', handleFieldChange);
+            studentLabel.appendChild(studentCheckbox);
+            div.appendChild(studentLabel);
+
+            // Dropdown "Responsável" - SEM MUDANÇA (Regra específica mantida)
+            const publisherLabel = document.createElement('label');
+            publisherLabel.textContent = ' Resp: ';
+            publisherLabel.style.marginLeft = '15px';
+            // A função createPublisherDropdown já contém a lógica:
+            // select.disabled = !isAdmin && currentUser?.id !== selectedPublisherId;
+            const publisherSelect = createPublisherDropdown(address.responsible_publisher_id, address.id, isAdmin);
+            publisherLabel.appendChild(publisherSelect);
+            div.appendChild(publisherLabel);
+
+            // --- INÍCIO: Campo de Anotação --- - AGORA HABILITADO PARA TODOS
+            const anotacaoLabel = document.createElement('label');
+            anotacaoLabel.textContent = ' ANOTAÇÕES: ';
+            anotacaoLabel.style.marginTop = '10px'; // Adiciona um espaço acima
+            anotacaoLabel.style.display = 'block'; // Faz ocupar a linha toda
+
+            const anotacaoTextarea = document.createElement('textarea');
+            anotacaoTextarea.value = address.anotacao || ''; // Pega o valor do banco ou deixa vazio
+            anotacaoTextarea.rows = 2; // Define uma altura inicial pequena
+            anotacaoTextarea.style.marginTop = '5px';
+            // anotacaoTextarea.disabled = !isAdmin; // REMOVIDO: Habilitado para todos os logados
+            anotacaoTextarea.dataset.field = 'anotacao'; // Identifica o campo para o handler
+            anotacaoTextarea.addEventListener('change', handleFieldChange); // Reutiliza o handler existente
+
+            anotacaoLabel.appendChild(anotacaoTextarea);
+            div.appendChild(anotacaoLabel);
+            // --- FIM: Adicionar Campo de Anotação ---
+
+            // Botão "Remover" (só para admin) - SEM MUDANÇA
+            if (isAdmin) {
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remover';
+                removeButton.classList.add('remove-button'); // Usa classe para estilo
+                removeButton.dataset.addressId = address.id;
+                removeButton.addEventListener('click', handleRemoveAddress);
+                div.appendChild(removeButton); // Adiciona no final
+            }
+
+            return div;
+        }
+
+
+        // --- Funções de Manipulação de Dados (Handlers - NOVOS com Supabase) ---
+
+        // *** MODIFICAÇÃO AQUI: Adiciona tratamento para textarea e select ***
+        async function handleFieldChange(event) {
+            const element = event.target;
+            const addressItem = element.closest('.address-item');
+            if (!addressItem) return; // Sai se não encontrar o item pai
+            const addressId = addressItem.dataset.addressId;
+            const field = element.dataset.field;
+            let value;
+            const isAdmin = currentUser?.role === 'admin'; // Verifica se é admin
+
+            console.log(`Mudança detectada: Endereço ${addressId}, Campo ${field}`);
+
+            // Obtém o valor dependendo do tipo de elemento
+            async function handleFieldChange(event) {
+            const element = event.target;
+            const addressItem = element.closest('.address-item');
+            // ... (código inicial da função) ...
+            const field = element.dataset.field;
+            let value;
+            const isAdmin = currentUser?.role === 'admin';
+
+            console.log(`Mudança detectada: Endereço ${addressId}, Campo ${field}`);
+
+            // Obtém o valor dependendo do tipo de elemento
+            if (element.type === 'checkbox') {
+                // Mantém a lógica para outros checkboxes (como 'is_student')
+                value = element.checked;
+                // REMOVIDO: Tratamento especial para found_date como checkbox
+                // value = field === 'found_date' ? (element.checked ? new Date().toISOString() : null) : element.checked;
+
+            // *** ADICIONADO: Tratamento para input de data ***
+            } else if (element.type === 'date') {
+                // Pega o valor 'YYYY-MM-DD' ou string vazia
+                // Converte string vazia para null, que é o esperado pelo Supabase para limpar a data
+                value = element.value || null;
+
+            } else if (element.isContentEditable) { // Para o span do endereço
+                value = element.textContent.trim();
+                // Atualiza o link do Google Maps se o endereço mudar
+                if (field === 'address_text') {
+                    const mapsLink = addressItem.querySelector('a[href*="google.com/maps"]');
+                    if(mapsLink) mapsLink.href = generateMapsLink(value);
+                }
+            } else if (element.tagName === 'TEXTAREA') { // Verifica se é um textarea
+                value = element.value; // Pega o valor do textarea
+            } else if (element.tagName === 'SELECT') { // Verifica se é um select
+                value = element.value || null; // Pega o valor do select (ID do usuário) ou null se for "Não atribuído"
+            } else {
+                console.warn("Tipo de campo não tratado para obter valor:", element.tagName, element.type);
+                return; // Não tenta salvar se não souber pegar o valor
+            }
+
+            console.log("Novo valor:", value);
+
+            // ... (restante da função try...catch...finally) ...
+
+            // Dentro do bloco finally, a lógica de reabilitar o campo já deve funcionar
+            // corretamente para o input de data, pois ele não é 'contentEditable'
+            // e a permissão de edição para 'found_date' é para todos os logados.
+            // A linha `element.disabled = false;` dentro do `if (field === 'found_date' ...)`
+            // vai reabilitar o input de data.
+        }
+
+
+            if (element.type === 'checkbox') {
+                // Tratamento especial para found_date: guarda data/hora ISO ou null
+                value = field === 'found_date' ? (element.checked ? new Date().toISOString() : null) : element.checked;
+            } else if (element.isContentEditable) { // Para o span do endereço
+                value = element.textContent.trim();
+                // Atualiza o link do Google Maps se o endereço mudar
+                if (field === 'address_text') {
+                    const mapsLink = addressItem.querySelector('a[href*="google.com/maps"]');
+                    if(mapsLink) mapsLink.href = generateMapsLink(value);
+                }
+            } else if (element.tagName === 'TEXTAREA') { // Verifica se é um textarea
+                value = element.value; // Pega o valor do textarea
+            } else if (element.tagName === 'SELECT') { // Verifica se é um select
+                value = element.value || null; // Pega o valor do select (ID do usuário) ou null se for "Não atribuído"
+            } else {
+                console.warn("Tipo de campo não tratado para obter valor:", element.tagName, element.type);
+                return; // Não tenta salvar se não souber pegar o valor
+            }
+
+            console.log("Novo valor:", value);
+
+            // Guarda o estado original de 'disabled' ou 'contentEditable'
+            const originalDisabledState = element.disabled;
+            const originalEditableState = element.isContentEditable ? element.contentEditable : null;
+
+            // Desabilita temporariamente durante o salvamento
+            if (element.isContentEditable) {
+                element.contentEditable = false;
+            } else {
+                element.disabled = true;
+            }
+
+
+            try {
+                const { error } = await supabaseClient
+                    .from('addresses')
+                    .update({ [field]: value }) // Usa nome do campo dinamicamente
+                    .eq('id', addressId);
+
+                if (error) throw error;
+                console.log(`Endereço ${addressId}, campo ${field} atualizado com sucesso.`);
+
+            } catch (error) {
+                console.error(`Erro ao atualizar campo ${field} do endereço ${addressId}:`, error.message);
+                alert(`Não foi possível salvar a alteração no campo ${field}. Tente novamente.`);
+                // Considerar reverter a mudança visual aqui, lendo o valor antigo antes de desabilitar
+                // Ex: element.value = valorAntigo; // Se fosse um input/textarea/select
+                // Ex: element.checked = valorAntigo; // Se fosse checkbox
+                // Ex: element.textContent = valorAntigo; // Se fosse contentEditable
+            } finally {
+                // *** MODIFICAÇÃO AQUI: Reabilita campos com base nas permissões ***
+                // Reabilita o elemento com base nas permissões definidas
+
+                if (field === 'found_date' || field === 'is_student' || field === 'anotacao') {
+                    // Esses campos podem ser editados por qualquer usuário logado
+                    element.disabled = false;
+                } else if (field === 'address_text') {
+                    // O span editável só é habilitado para admins
+                    element.contentEditable = isAdmin;
+                } else if (field === 'responsible_publisher_id') {
+                    // O select de responsável tem regra específica
+                    const currentResponsibleId = addressItem.querySelector('select[data-field="responsible_publisher_id"]')?.value || null;
+                    element.disabled = !isAdmin && currentUser?.id !== currentResponsibleId;
+                } else {
+                    // Caso algum outro campo seja adicionado no futuro,
+                    // por padrão, só reabilita se for admin (mais seguro)
+                    // (Se for contentEditable, já foi tratado acima)
+                    if (!element.isContentEditable) {
+                         element.disabled = !isAdmin;
+                    }
+                }
+            }
+        }
+
+        // REMOVIDO: handlePublisherChange (agora é tratado pelo handleFieldChange genérico)
+
+        async function handleRemoveAddress(event) {
+            const button = event.target;
+            const addressId = button.dataset.addressId;
+            const addressItem = button.closest('.address-item');
+            // Tenta pegar o texto do span editável ou do textarea de anotação como fallback
+            const addressText = addressItem.querySelector('span[data-field="address_text"]')?.textContent ||
+                                addressItem.querySelector('textarea[data-field="anotacao"]')?.value ||
+                                `ID ${addressId}`;
+
+            console.log(`Tentando remover endereço: ${addressId}`);
+
+            if (!confirm(`Tem certeza que deseja remover o endereço "${addressText.substring(0, 50)}..."? Esta ação não pode ser desfeita.`)) return;
+
+            button.disabled = true;
+            button.textContent = 'Removendo...';
+
+            try {
+                const { error } = await supabaseClient
+                    .from('addresses')
+                    .delete()
+                    .eq('id', addressId);
+
+                if (error) throw error;
+                console.log(`Endereço ${addressId} removido com sucesso.`);
+                addressItem.remove(); // Remove o elemento da UI
+
+            } catch (error) {
+                console.error(`Erro ao remover endereço ${addressId}:`, error.message);
+                alert("Não foi possível remover o endereço. Tente novamente.");
+                button.disabled = false;
+                button.textContent = 'Remover';
+            }
+        }
+
+        async function handleAddAddress(event) {
+            const button = event.target;
+            const mapId = button.dataset.mapId;
+            const mapCard = button.closest('.map-card');
+            const addressesList = mapCard.querySelector('.addresses-list');
+
+            console.log(`Tentando adicionar endereço ao mapa ${mapId}`);
+            const newAddressText = prompt("Digite o novo endereço:", "");
+            if (newAddressText === null || newAddressText.trim() === "") {
+                console.log("Adição de endereço cancelada.");
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Adicionando...';
+
+            try {
+                // Insere o novo endereço com valores padrão
+                const { data, error } = await supabaseClient
+                    .from('addresses')
+                    .insert([{
+                        map_id: mapId,
+                        address_text: newAddressText.trim(),
+                        found_date: null,
+                        is_student: false,
+                        responsible_publisher_id: null,
+                        anotacao: null // Inclui anotação como null por padrão
+                     }])
+                    .select(`*, profiles (id, username)`) // Pede para retornar o registro completo, incluindo perfil (embora seja null aqui)
+                    .single();
+
+                if (error) throw error;
+                console.log("Endereço adicionado com sucesso:", data);
+
+                const isAdmin = currentUser?.role === 'admin';
+                const newAddressElement = createAddressElement(data, isAdmin);
+
+                // Remove a mensagem "Nenhum endereço" se existir
+                if (addressesList.textContent === 'Nenhum endereço neste mapa.') {
+                     addressesList.innerHTML = '';
+                }
+                // Adiciona o novo elemento à lista
+                addressesList.appendChild(newAddressElement);
+                // Opcional: Rolar para o novo elemento
+                newAddressElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (error) {
+                console.error(`Erro ao adicionar endereço ao mapa ${mapId}:`, error.message);
+                alert("Não foi possível adicionar o endereço. Tente novamente.");
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Adicionar Endereço';
+            }
+        }
+
+        async function handleCreateMap() {
+            console.log("Tentando criar novo mapa...");
+            const mapName = prompt("Digite o nome para o novo mapa:", `Novo Mapa ${new Date().toLocaleDateString()}`);
+            if (mapName === null || mapName.trim() === "") {
+                console.log("Criação de mapa cancelada.");
+                return;
+            }
+
+            createMapButton.disabled = true;
+            createMapButton.textContent = 'Criando...';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('maps')
+                    .insert([{ name: mapName.trim() }])
+                    .select() // Pede para retornar o mapa criado
+                    .single();
+
+                if (error) throw error;
+                console.log("Novo mapa criado com sucesso:", data);
+                // Recarrega a lista inteira para mostrar o novo mapa
+                await loadMapsFromSupabase();
+
+            } catch (error) {
+                console.error("Erro ao criar novo mapa:", error.message);
+                 // Verifica erro de constraint de nome único (se existir no DB)
+                if (error.code === '23505') { // Código PostgreSQL para unique violation
+                    alert(`Erro: Já existe um mapa com o nome "${mapName.trim()}". Escolha outro nome.`);
+                } else {
+                    alert("Não foi possível criar o novo mapa. Tente novamente.");
+                }
+            } finally {
+                createMapButton.disabled = false;
+                createMapButton.textContent = 'Criar Novo Mapa';
+            }
+        }
+
+
+        // --- Verificação de Sessão e Inicialização ---
+        async function checkUserSessionAndInitialize() {
+            console.log("Verificando sessão do usuário e inicializando...");
+
+            // Listener para mudanças no estado de autenticação (login/logout/token refresh/retorno OAuth)
+            supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+                console.log("Evento onAuthStateChange:", _event, session);
+
+                // Se a sessão mudou e agora existe (ou usuário mudou), busca o perfil
+                if (session && (!currentUser || currentUser.id !== session.user.id)) {
+                     console.log("Nova sessão detectada ou usuário mudou, buscando perfil...");
+                    try {
+                        const { data: profile, error: profileError } = await supabaseClient
+                            .from('profiles')
+                            .select('id, username, role, email')
+                            .eq('id', session.user.id)
+                            .single();
+
+                        // Se der erro ao buscar perfil, desloga
+                        if (profileError) throw profileError;
+
+                        // Se o perfil não existir no DB (ex: usuário do Google novo sem perfil criado pelo trigger)
+                        if (!profile) {
+                             console.warn("Sessão ativa (onAuthStateChange), mas perfil não encontrado no DB para ID:", session.user.id);
+                             alert("Seus dados de usuário não foram encontrados após o login. Pode ser necessário criar seu perfil. Por favor, tente novamente ou contate o administrador.");
+                             await supabaseClient.auth.signOut(); // Força logout
+                             showLoginView(); // Mostra login view explicitamente
+                             return; // Interrompe aqui
+                        }
+
+                        // Perfil encontrado, atualiza currentUser
+                        console.log("Perfil do usuário carregado via onAuthStateChange:", profile);
+                        currentUser = {
+                            id: profile.id,
+                            email: profile.email || session.user.email,
+                            name: profile.username,
+                            role: profile.role || 'user' // Default role
+                        };
+
+                        // Se a view do app ainda não estiver visível, busca dados e mostra
+                        if (appSection.style.display !== 'block') {
+                            await fetchAndCacheUsers(); // Busca usuários para dropdowns
+                            showAppView();
+                            loadMapsFromSupabase(); // Carrega mapas
+                        } else {
+                            // Se já estava na app view (ex: refresh de token), apenas atualiza a saudação e recarrega mapas
+                            userGreetingName.textContent = currentUser.name;
+                            loadMapsFromSupabase(); // Recarrega para aplicar permissões visuais
+                        }
+
+                    } catch (error) {
+                         // Erro ao buscar perfil
+                         console.error("Erro ao buscar perfil do usuário logado (onAuthStateChange):", error.message);
+                         alert("Erro ao carregar seus dados de usuário após o login. Tentando deslogar...");
+                         await supabaseClient.auth.signOut();
+                         showLoginView(); // Mostra login view explicitamente
+                    }
+                } else if (!session && currentUser) {
+                    // Se a sessão terminou (logout em outra aba, token expirado sem refresh) e tínhamos um usuário logado
+                    console.log("Sessão terminada (onAuthStateChange), mostrando login view...");
+                    showLoginView();
+                }
+                // Se !session e !currentUser, não faz nada (já está na tela de login)
+            });
+
+
+            // Verificação inicial da sessão ao carregar a página
+            console.log("Verificando sessão inicial...");
+            const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+
+            if (sessionError) {
+                console.error("Erro crítico ao verificar sessão inicial:", sessionError.message);
+                alert("Erro ao verificar o estado de login inicial. Recarregue a página.");
+                showLoginView(); // Mostra login como fallback
+                return;
+            }
+
+            // Se existe sessão inicial, o onAuthStateChange será disparado logo em seguida e cuidará da lógica.
+            // Apenas garantimos que, se não houver sessão, a tela de login seja mostrada.
+            if (!session) {
+                console.log("Nenhuma sessão inicial ativa encontrada.");
+                currentUser = null;
+                await fetchAndCacheUsers(); // Carrega usuários para o dropdown de login
+                showLoginView(); // Mostra a tela de login
+            } else {
+                 console.log("Sessão inicial encontrada. Aguardando onAuthStateChange para carregar perfil...");
+                 // O onAuthStateChange vai lidar com a busca do perfil e exibição da view correta.
+            }
+        }
+
+        // --- Event Listeners ---
+        console.log("Adicionando event listeners...");
+        userSelect.addEventListener('change', handleUserSelection);
+        loginButton.addEventListener('click', handleLogin);
+        logoutButton.addEventListener('click', showLoginView);
+        createMapButton.addEventListener('click', handleCreateMap);
+        // Adicionado: Listener para o botão do Google
+        googleLoginButton.addEventListener('click', handleGoogleLogin);
+
+        // Listener para tecla Enter no campo de senha
+        passwordInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Impede envio de formulário (caso exista)
+                // Verifica se o botão de login está habilitado antes de tentar logar
+                if (!loginButton.disabled) {
+                    handleLogin();
+                }
+            }
+        });
+        console.log("Event listeners adicionados.");
+
+
+        // --- Inicialização da Aplicação ---
+        // Adiciona o listener para quando o DOM estiver pronto
+        document.addEventListener('DOMContentLoaded', checkUserSessionAndInitialize);
+        console.log("Inicialização agendada para DOMContentLoaded.");
+
+    </script>
+</body>
+</html>

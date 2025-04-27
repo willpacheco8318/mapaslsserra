@@ -1,0 +1,216 @@
+/* Estilos Gerais */
+body {
+    font-family: sans-serif;
+    padding: 20px;
+    background-color: #f0f2f5; /* Mantendo um fundo neutro para a página */
+    color: #333; /* Cor padrão do texto */
+    font-weight: bold; /* TODAS as letras em negrito */
+}
+
+/* Seções Principais */
+#login-section, #app-section {
+    border: 2px solid #8f5edf; /* Borda roxa mais grossa */
+    padding: 20px; /* Mais espaçamento */
+    margin-bottom: 20px;
+    background-color: #ffffff; /* Fundo branco para contraste */
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(143, 94, 223, 0.2); /* Sombra suave roxa */
+}
+
+#app-section {
+    display: none; /* Começa escondido */
+}
+
+/* Card do Mapa */
+.map-card {
+    border: 1px solid #7a4bb5; /* Borda roxa um pouco mais escura */
+    padding: 15px;
+    margin-bottom: 20px; /* Mais espaço entre mapas */
+    background-color: #8f5edf; /* Fundo ROXO para o card do mapa */
+    color: #ffffff; /* Texto BRANCO para contraste com o fundo roxo */
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.map-card h3 {
+    color: #ffffff; /* Título do mapa em BRANCO */
+    margin-top: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5); /* Linha separadora branca translúcida */
+    padding-bottom: 10px;
+    font-size: 1.4em; /* Título um pouco maior */
+}
+
+/* Item de Endereço */
+.address-item {
+    margin-left: 0; /* Alinhado */
+    padding: 15px;
+    border: 1px solid #8bbac7; /* Borda azul um pouco mais escura */
+    background-color: #a9d4e0; /* Fundo AZUL CLARO para cada endereço */
+    color: #1f3c4d; /* Texto AZUL ESCURO para contraste com o fundo azul claro */
+    border-radius: 6px;
+    margin-bottom: 10px;
+    margin-top: 15px; /* Espaço acima do primeiro endereço */
+}
+
+/* Labels e Inputs */
+label {
+    display: block;
+    margin-bottom: 5px;
+    /* font-weight: bold; */ /* Removido pois já está no body */
+    color: inherit; /* Herda a cor do container (.address-item ou #login-section) */
+}
+
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+    margin-bottom: 10px;
+    padding: 10px; /* Mais padding */
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    width: 100%; /* Ocupa largura total */
+    background-color: #fff; /* Fundo branco para inputs */
+    color: #333; /* Texto escuro nos inputs */
+    font-weight: normal; /* Deixa o texto DENTRO dos inputs normal (não negrito) */
+}
+
+input[type="checkbox"] {
+    margin-bottom: 10px;
+    vertical-align: middle; /* Alinha melhor com o texto */
+    transform: scale(1.2); /* Checkbox um pouco maior */
+    margin-right: 8px;
+}
+
+textarea {
+    width: 100%; /* Ajustado para 100% */
+    font-family: sans-serif;
+    font-weight: normal; /* Texto normal no textarea */
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: #8f5edf; /* Borda roxa ao focar */
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(143, 94, 223, 0.25); /* Sombra roxa suave */
+}
+
+/* Mensagens e Saudação */
+#login-error {
+    color: #dc3545; /* Vermelho para erros */
+    font-weight: bold; /* Garante negrito para erro */
+}
+
+#user-greeting {
+    /* font-weight: bold; */ /* Removido pois já está no body */
+    margin-bottom: 15px;
+    color: #8f5edf; /* Saudação em roxo */
+    font-size: 1.1em;
+}
+
+/* Botões */
+button {
+    padding: 10px 18px; /* Padding ajustado */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    /* font-weight: bold; */ /* Removido pois já está no body */
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    margin-right: 10px; /* Espaço entre botões */
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+button:active {
+     transform: scale(0.98);
+}
+
+/* Botões Específicos */
+#login-button {
+    background-color: #8f5edf; /* Roxo principal */
+    color: white;
+}
+#login-button:hover {
+    background-color: #7a4bb5; /* Roxo mais escuro */
+}
+
+#google-login-button {
+    background-color: #4285F4; /* Mantendo azul Google ou pode mudar */
+    /* background-color: #a9d4e0; */ /* Alternativa: Azul claro do tema */
+    /* color: #1f3c4d; */ /* Texto escuro se usar fundo azul claro */
+    color: white;
+    border: none;
+}
+#google-login-button:hover {
+    background-color: #357ae8;
+    /* background-color: #97c4d1; */ /* Hover da alternativa */
+}
+
+#logout-button {
+    background-color: #6c757d; /* Cinza */
+    color: white;
+    float: right; /* Alinha botão de sair à direita */
+}
+#logout-button:hover {
+    background-color: #5a6268;
+}
+
+/* Botão Adicionar/Criar (dentro do card roxo) */
+.map-card button { /* Estilo para botões DENTRO do map-card */
+    background-color: #a9d4e0; /* Fundo azul claro */
+    color: #1f3c4d; /* Texto escuro */
+    margin-top: 10px;
+}
+.map-card button:hover {
+    background-color: #97c4d1; /* Azul claro mais escuro */
+}
+
+/* Botão Remover (dentro do item azul claro) */
+.remove-button {
+    background-color: #ffc107; /* Amarelo alerta */
+    color: #333;
+    padding: 5px 10px;
+    font-size: 0.9em;
+    margin-left: 10px;
+    vertical-align: middle;
+    border-radius: 4px; /* Borda levemente arredondada */
+}
+.remove-button:hover {
+    background-color: #e0a800;
+    text-decoration: none; /* Remove sublinhado do hover anterior */
+}
+
+/* Edição Inline e Links */
+.address-item span[contenteditable="true"] {
+    border-bottom: 1px dashed #8f5edf; /* Linha roxa tracejada */
+    cursor: text;
+    padding: 2px;
+    background-color: rgba(255, 255, 255, 0.3); /* Fundo branco levemente transparente */
+}
+.address-item span[contenteditable="true"]:focus {
+    outline: 1px solid #8f5edf; /* Outline roxo */
+    background-color: #ffffff; /* Fundo branco sólido ao editar */
+}
+
+.address-item a { /* Link 'Ver Mapa' */
+    font-size: 0.9em;
+    margin-left: 8px;
+    color: #8f5edf; /* Link em roxo */
+    text-decoration: none; /* Sem sublinhado */
+}
+.address-item a:hover {
+    text-decoration: underline; /* Sublinhado no hover */
+    color: #7a4bb5; /* Roxo mais escuro no hover */
+}
+
+/* Ajustes Finais de Layout */
+.address-item > div, .address-item > label {
+    margin-bottom: 8px;
+}
+.address-item label > input[type="checkbox"] {
+    margin-left: 0; /* Checkbox alinhado à esquerda */
+}
+.address-item label > select {
+    margin-left: 5px;
+}
